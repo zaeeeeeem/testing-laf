@@ -6,20 +6,13 @@ header('Content-Type: application/json');
 
 $response = ['success' => false, 'message' => '', 'items' => []];
 
-// Check if user is logged in (optional for public listings, but good practice)
-if (!isset($_SESSION['user_id'])) {
-    // For competition, we might allow viewing listings without login,
-    // but posting/claiming requires it. Decide based on time.
-    // For now, let's allow viewing.
-    // $response['message'] = 'User not logged in.';
-    // echo json_encode($response);
-    // exit;
-}
-
-$item_type = isset($_GET['type']) ? $_GET['type'] : ''; // 'lost' or 'found'
+$item_type = isset($_GET['type']) ? $_GET['type'] : '';
 $category_filter = isset($_GET['category']) ? $_GET['category'] : '';
 $location_filter = isset($_GET['location']) ? $_GET['location'] : '';
-$user_id_filter = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0; // For user's dashboard
+$user_id_filter = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
+
+// ADD THIS NEW LINE:
+$show_all = isset($_GET['show_all']) && $_GET['show_all'] === 'true'; // New parameter for admin/full listings
 
 $sql = "SELECT i.*, u.name as user_name FROM items i JOIN users u ON i.user_id = u.id WHERE 1=1";
 $params = [];
@@ -44,6 +37,8 @@ if ($user_id_filter > 0) {
     $sql .= " AND i.user_id = ?";
     $params[] = $user_id_filter;
     $types .= "i";
+} elseif (!$show_all) { // Apply status filter ONLY if not showing all AND not a specific user's dashboard
+    $sql .= " AND (i.status = 'active' OR i.status = 'claimed')";
 }
 
 $sql .= " ORDER BY i.created_at DESC"; // Order by most recent

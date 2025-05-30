@@ -53,12 +53,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $response['message'] = 'Claim status updated to ' . $status . '.';
 
                     // If claim is approved, mark the item as 'resolved'
+                    $sql_update_item_status = null;
                     if ($status === 'approved') {
-                        $sql_resolve_item = "UPDATE items SET status = 'resolved' WHERE id = ?";
-                        if ($stmt_resolve = mysqli_prepare($conn, $sql_resolve_item)) {
-                            mysqli_stmt_bind_param($stmt_resolve, "i", $claim_data['item_id']);
-                            mysqli_stmt_execute($stmt_resolve);
-                            mysqli_stmt_close($stmt_resolve);
+                        $sql_update_item_status = "UPDATE items SET status = 'resolved' WHERE id = ?";
+                    } elseif ($status === 'rejected') {
+                        // If claim is rejected, set the item status back to 'active'
+                        $sql_update_item_status = "UPDATE items SET status = 'active' WHERE id = ?";
+                    }
+
+                    if ($sql_update_item_status) { // Only execute if an update query is set
+                        if ($stmt_item_status = mysqli_prepare($conn, $sql_update_item_status)) {
+                            mysqli_stmt_bind_param($stmt_item_status, "i", $claim_data['item_id']);
+                            mysqli_stmt_execute($stmt_item_status);
+                            mysqli_stmt_close($stmt_item_status);
                         }
                     }
                 } else {

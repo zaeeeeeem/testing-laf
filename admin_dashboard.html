@@ -12,7 +12,7 @@
 <body class="bg-gray-100 text-gray-900 font-sans">
     <nav class="bg-indigo-600 p-4 shadow-md sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="user_dashboard.html" class="text-white text-2xl font-bold tracking-wide">UMT L&F Portal</a>
+            <a href="index.html" class="text-white text-2xl font-bold tracking-wide">UMT L&F Portal</a>
             <div class="flex space-x-4 items-center">
                 <a href="lost_items.html" class="text-white hover:text-indigo-100 transition duration-150 py-2 px-3 rounded-md hover:bg-indigo-700">Lost Items</a>
                 <a href="found_items.html" class="text-white hover:text-indigo-100 transition duration-150 py-2 px-3 rounded-md hover:bg-indigo-700">Found Items</a>
@@ -34,6 +34,7 @@
         <div id="adminContent" class="hidden">
             <div class="bg-white p-6 rounded-lg shadow-xl mb-8">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4">All Items (Lost & Found)</h2>
+
                 <div id="allItemsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <p id="noAllItems" class="col-span-full text-center text-gray-600 hidden">No items found.</p>
                 </div>
@@ -49,6 +50,9 @@
     </main>
 
     <script>
+        // Global variable for current user ID (for admin session check consistency)
+        let currentUserId = null; 
+
         async function checkSessionAndNavbar() {
             try {
                 const response = await fetch('php/check_session.php');
@@ -59,6 +63,7 @@
                 const adminContent = document.getElementById('adminContent');
                 
                 if (data.loggedIn) {
+                    currentUserId = data.userId; // Store ID
                     userNameDisplay.textContent = `Hello, ${data.userName}!`;
                     logoutBtn.style.display = 'inline-block';
 
@@ -68,13 +73,18 @@
                         adminAccessDenied.classList.add('hidden');
                         loadAdminDashboard(); // Function to load admin data
                     } else {
+                        // Redirect non-admin users to the user dashboard
                         adminContent.classList.add('hidden');
-                        adminAccessDenied.classList.remove('hidden');
+                        adminAccessDenied.classList.remove('hidden'); // Show the error message briefly, then redirect
+                        setTimeout(() => {
+                            window.location.href = 'user_dashboard.html'; 
+                        }, 2000); // Redirect after 2 seconds
                     }
 
                 } else {
                     userNameDisplay.textContent = '';
                     logoutBtn.style.display = 'none';
+                    // Redirect to login if not logged in and not on login/register page
                     if (!['login.html', 'register.html'].includes(window.location.pathname.split('/').pop())) {
                         window.location.href = 'login.html';
                     }
@@ -105,8 +115,8 @@
             noPendingClaims.classList.add('hidden');
 
             try {
-                // Fetch all items (lost and found)
-                const allItemsResponse = await fetch('php/get_items.php?type='); // No type filter to get all
+                // Fetch all items (lost and found) - includes show_all=true to bypass status filter
+                const allItemsResponse = await fetch('php/get_items.php?type=&show_all=true'); 
                 const allItemsData = await allItemsResponse.json();
 
                 if (allItemsData.success && allItemsData.items.length > 0) {
@@ -117,26 +127,25 @@
                     noAllItems.classList.remove('hidden');
                 }
 
-                // Fetch pending claims
-                const pendingClaimsResponse = await fetch('php/get_claims.php?type=claims_on_my_items'); // Admins see all claims on all items for simplicity
+                // Fetch pending claims for admin
+                const pendingClaimsResponse = await fetch('php/get_claims.php?type=all_pending_for_admin');
                 const pendingClaimsData = await pendingClaimsResponse.json();
 
                 if (pendingClaimsData.success && pendingClaimsData.claims.length > 0) {
-                    // Filter specifically for pending claims for the admin view
                     const filteredPendingClaims = pendingClaimsData.claims.filter(claim => claim.claim_status === 'pending');
                     if (filteredPendingClaims.length > 0) {
                          filteredPendingClaims.forEach(claim => {
                             pendingClaimsList.innerHTML += createAdminClaimCard(claim);
                         });
-                        // Attach event listeners to claim buttons
-                        attachAdminClaimEventListeners();
                     } else {
                         noPendingClaims.classList.remove('hidden');
                     }
-                   
                 } else {
                     noPendingClaims.classList.remove('hidden');
                 }
+
+                // Attach event listeners after ALL content (items and claims) have been rendered
+                attachAdminClaimEventListeners(); 
 
             } catch (error) {
                 console.error('Error loading admin dashboard:', error);
@@ -167,8 +176,16 @@
                         <p class="text-xs text-gray-600 mb-2">Posted by ${item.user_name}</p>
                         ${statusBadge(item.status)}
                         <div class="mt-3 flex gap-2">
-                             ${item.status !== 'resolved' ? `<button data-item-id="${item.id}" data-status="resolved" class="update-item-status-btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1 rounded">Mark Resolved</button>` : ''}
-                             ${item.status !== 'archived' ? `<button data-item-id="${item.id}" data-status="archived" class="update-item-status-btn bg-gray-500 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">Archive</button>` : ''}
+                             ${(item.status === 'active' || item.status === 'claimed') ? `
+                                 <button data-item-id="${item.id}" data-status="resolved" class="update-item-status-btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1 rounded">Mark Resolved</button>
+                                 <button data-item-id="${item.id}" data-status="archived" class="update-item-status-btn bg-gray-500 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">Archive</button>
+                             ` : ''}
+                             ${item.status === 'archived' ? `
+                                 <button data-item-id="${item.id}" data-status="active" class="update-item-status-btn bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded">Unarchive</button>
+                             ` : ''}
+                             ${item.status === 'resolved' ? `
+                                 <button data-item-id="${item.id}" data-status="active" class="update-item-status-btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1 rounded">Unresolve</button>
+                             ` : ''}
                         </div>
                     </div>
                 </div>
@@ -246,7 +263,7 @@
                     method: 'POST',
                     body: formData
                 });
-                const data = await response.json();
+                const data = await response.json(); 
                 if (data.success) {
                     alert(data.message);
                     loadAdminDashboard(); // Reload data after update
