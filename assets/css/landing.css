@@ -21,6 +21,10 @@ html {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     color: var(--text);
     background-color: var(--bg);
@@ -330,6 +334,7 @@ nav #Register{
 
 .review-card {
     min-width: 100%;
+    flex-shrink: 0; /* Add this */
     padding: 0 20px;
     box-sizing: border-box;
 }
@@ -644,6 +649,7 @@ footer {
     color: white;
     transform: rotate(10deg);
 }
+
 
 
 .feature-card h3 {

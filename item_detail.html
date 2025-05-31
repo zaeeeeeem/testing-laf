@@ -41,7 +41,9 @@
                 if (data.loggedIn) {
                     userNameDisplay.textContent = `Hello, ${data.userName}!`;
                     logoutBtn.style.display = 'inline-block';
+                    currentUserId = data.userId; // Store the user ID here
                 } else {
+                    currentUserId = null; // Ensure it's null if not logged in
                     userNameDisplay.textContent = '';
                     logoutBtn.style.display = 'none';
                     if (!['login.html', 'register.html'].includes(window.location.pathname.split('/').pop())) {
@@ -89,10 +91,19 @@
                     loadingMessage.classList.add('hidden');
                     const item = data.item;
 
-                    const claimButton = item.type === 'found' && item.status === 'active' ? 
+                    const foundItemContactButton = item.type === 'lost' && currentUserId && item.user_id != currentUserId ?
+                    `<button id="foundItemContactBtn" class="mt-6 w-full md:w-auto flex justify-center py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-150 ease-in-out">
+                        I Found This Item / Contact Owner
+                    </button>
+                    <div id="ownerContactInfo" class="mt-4 p-3 text-sm rounded-md bg-purple-100 text-purple-800 hidden">
+                        <strong>Owner Contact:</strong> <span id="ownerEmail">${item.user_email}</span>
+                        <p class="text-xs text-gray-600 mt-1">Please contact them directly to coordinate return.</p>
+                    </div>` : '';
+
+                    const claimButton = item.type === 'found' && item.status === 'active' && currentUserId && item.user_id != currentUserId ? // Only show if found, active, logged in, and not own item
                         `<button id="claimItemBtn" class="mt-6 w-full md:w-auto flex justify-center py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition duration-150 ease-in-out">
                             Claim This Item
-                         </button>` : '';
+                        </button>` : '';
 
                     const statusBadge = (status) => {
                         let colorClass = '';
@@ -125,11 +136,25 @@
                             </div>
                             <div class="mt-6 pt-6 border-t border-gray-200">
                                 <p class="text-sm text-gray-500">Posted by: <span class="font-medium text-gray-700">${item.user_name}</span> on ${new Date(item.created_at).toLocaleDateString()}</p>
-                                ${item.type === 'found' ? claimButton : ''}
+
+                                ${item.type === 'found' ? claimButton : ''}  ${item.type === 'lost' ? foundItemContactButton : ''}
                                 <div id="claimMessage" class="mt-4 p-3 text-sm text-center rounded-md hidden"></div>
                             </div>
                         </div>
                     `;
+
+                    if (item.type === 'lost' && currentUserId) { // Ensure button exists and user is logged in
+                        const foundItemContactBtn = document.getElementById('foundItemContactBtn');
+                        if (foundItemContactBtn) { // Check if the button actually exists (it might not if not logged in)
+                            foundItemContactBtn.addEventListener('click', () => {
+                                const ownerContactInfo = document.getElementById('ownerContactInfo');
+                                if (ownerContactInfo) {
+                                    ownerContactInfo.classList.remove('hidden'); // Show the contact info
+                                    foundItemContactBtn.classList.add('hidden'); // Hide the button after clicked
+                                }
+                            });
+                        }
+                    }
 
                     // Add event listener for the claim button if it exists
                     if (item.type === 'found' && item.status === 'active') {

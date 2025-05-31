@@ -50,11 +50,11 @@ if ($stmt->num_rows > 0) {
 $stmt->close();
 
 // Hash the password
-$hashed_password = password_hash($password, PASSWORD_DEFAULT);
+// $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
 // Insert user into database
 $stmt = $conn->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-$stmt->bind_param("sss", $name, $email, $hashed_password);
+$stmt->bind_param("sss", $name, $email, $password);
 
 if ($stmt->execute()) {
     echo json_encode(['success' => true, 'message' => 'Registration successful!']);
