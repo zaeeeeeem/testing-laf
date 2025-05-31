@@ -1,5 +1,4 @@
 <?php
-// php/get_claims.php
 require_once 'config.php';
 
 header('Content-Type: application/json');
@@ -21,23 +20,23 @@ $types = "";
 
 if ($type === 'my_claims') {
     // Claims made by the current user
-    $sql = "SELECT c.*, i.name as item_name, i.image_url, i.type as item_type, u.name as finder_name, u.email as finder_email
+    $sql = "SELECT c.*, i.name as item_name, i.image_url, i.type as item_type, finder_u.name as finder_name, finder_u.email as finder_email
             FROM claims c
             JOIN items i ON c.item_id = i.id
-            JOIN users u ON i.user_id = u.id
+            JOIN users finder_u ON i.user_id = finder_u.id
             WHERE c.claimer_id = ? ORDER BY c.created_at DESC";
     $params = [$user_id];
     $types = "i";
 } elseif ($type === 'claims_on_my_items') {
     // Claims on items posted by the current user
-    $sql = "SELECT c.*, i.name as item_name, i.image_url, i.type as item_type, u.name as claimer_name, u.email as claimer_email
+    $sql = "SELECT c.*, i.name as item_name, i.image_url, i.type as item_type, claimer_u.name as claimer_name, claimer_u.email as claimer_email
             FROM claims c
             JOIN items i ON c.item_id = i.id
-            JOIN users u ON c.claimer_id = u.id
+            JOIN users claimer_u ON c.claimer_id = claimer_u.id
             WHERE i.user_id = ? ORDER BY c.created_at DESC";
     $params = [$user_id];
     $types = "i";
-} elseif ($type === 'all_pending_for_admin') { // <-- NEW ADMIN TYPE
+} elseif ($type === 'all_pending_for_admin') {
     // For admin dashboard: get ALL pending claims in the system
     $sql = "SELECT c.*, i.name as item_name, i.image_url, i.type as item_type,
                    finder_u.name as finder_name, finder_u.email as finder_email,
@@ -54,8 +53,6 @@ if ($type === 'my_claims') {
     exit;
 }
 
-// This section needs to be adjusted because some cases (like all_pending_for_admin)
-// might not have $params or $types set.
 if ($stmt = mysqli_prepare($conn, $sql)) {
     if (!empty($params)) { // Only bind parameters if $params array is not empty
         mysqli_stmt_bind_param($stmt, $types, ...$params);
@@ -70,11 +67,11 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
         $response['success'] = true;
         $response['claims'] = $claims;
     } else {
-        $response['message'] = 'Error fetching claims: ' . mysqli_error($conn);
+        $response['message'] = 'Error fetching claims: ' . mysqli_error($conn) . ' SQL: ' . $sql . ' Types: ' . $types . ' Params: ' . json_encode($params); // Added debug info
     }
     mysqli_stmt_close($stmt);
 } else {
-    $response['message'] = 'Database query preparation failed: ' . mysqli_error($conn);
+    $response['message'] = 'Database query preparation failed: ' . mysqli_error($conn) . ' SQL: ' . $sql; // Added debug info
 }
 
 echo json_encode($response);
