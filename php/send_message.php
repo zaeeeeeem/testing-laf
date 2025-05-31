@@ -1,6 +1,7 @@
 <?php
+error_reporting(E_ALL); // TEMPORARY: Ensure this line is present
+ini_set('display_errors', 1); // TEMPORARY: Ensure this line is present
 // php/send_message.php
-session_start();
 require_once 'config.php';
 
 header('Content-Type: application/json');

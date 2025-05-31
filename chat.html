@@ -63,7 +63,7 @@
 <body class="bg-gray-100 text-gray-900 font-sans">
     <nav class="bg-indigo-600 p-4 shadow-md sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="index.html" class="text-white text-2xl font-bold tracking-wide">UMT L&F Portal</a>
+            <a href="user_dashboard.html" class="text-white text-2xl font-bold tracking-wide">UMT L&F Portal</a>
             <div class="flex space-x-4 items-center">
                 <a href="lost_items.html" class="text-white hover:text-indigo-100 transition duration-150 py-2 px-3 rounded-md hover:bg-indigo-700">Lost Items</a>
                 <a href="found_items.html" class="text-white hover:text-indigo-100 transition duration-150 py-2 px-3 rounded-md hover:bg-indigo-700">Found Items</a>
@@ -101,7 +101,7 @@
                 const data = await response.json();
                 const userNameDisplay = document.getElementById('userNameDisplay');
                 const logoutBtn = document.getElementById('logoutBtn');
-
+                
                 if (data.loggedIn) {
                     currentUserId = data.userId; // Store ID
                     userNameDisplay.textContent = `Hello, ${data.userName}!`;
@@ -111,8 +111,9 @@
                     currentUserId = null;
                     userNameDisplay.textContent = '';
                     logoutBtn.style.display = 'none';
+                    // Redirect if not logged in AND not on login/register page
                     if (!['login.html', 'register.html'].includes(window.location.pathname.split('/').pop())) {
-                        window.location.href = 'login.html'; // Redirect if not logged in
+                        window.location.href = 'login.html'; 
                     }
                 }
             } catch (error) {
@@ -140,8 +141,13 @@
                 document.getElementById('chatMessage').textContent = 'Error: No claim ID provided for chat.';
                 document.getElementById('chatMessage').className = 'mt-4 p-3 text-sm text-center rounded-md bg-red-100 text-red-700';
                 document.getElementById('chatMessage').classList.remove('hidden');
+                // Stop any polling if claimId is missing
+                if (pollingInterval) clearInterval(pollingInterval);
                 return;
             }
+
+            // Clear existing interval if it was set (e.g., on re-initialization)
+            if (pollingInterval) clearInterval(pollingInterval);
 
             // Initial load of messages
             fetchMessages();
@@ -153,15 +159,25 @@
             document.getElementById('sendMessageBtn').addEventListener('click', sendMessage);
             document.getElementById('messageInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent default Enter key behavior (like new line)
                     sendMessage();
                 }
+            });
+
+            // Clean up interval when navigating away (best practice)
+            window.addEventListener('beforeunload', () => {
+                if (pollingInterval) clearInterval(pollingInterval);
             });
         }
 
         async function fetchMessages() {
             const messagesArea = document.getElementById('messagesArea');
             const loadingMessages = document.getElementById('loadingMessages');
-            loadingMessages.classList.remove('hidden');
+            // Show loading only on first load or if no messages. Hide if messages are present.
+            if (messagesArea.innerHTML.trim() === '' || messagesArea.innerHTML.trim() === '<p id="loadingMessages" class="text-center text-gray-500">Loading messages...</p>') {
+                 loadingMessages.classList.remove('hidden');
+            }
+
 
             try {
                 const response = await fetch(`php/get_messages.php?claim_id=${claimId}`);
@@ -174,4 +190,71 @@
                         const isSent = msg.sender_id == currentUserId;
                         messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
                         messageElement.innerHTML = `
-                            <div class="message-bubble <span class="math-inline">\{isSent ? 'bg\-indigo\-600 text\-white' \: 'bg\-gray\-200 text\-gray\-900'\}"\>
+                            <div class="message-bubble">
+                                <div class="message-sender">${isSent ? 'You' : msg.sender_name}</div>
+                                ${msg.message_text}
+                                <div class="text-xs mt-1 text-gray-500 ${isSent ? 'text-right' : 'text-left'}">${new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
+                        `;
+                        messagesArea.appendChild(messageElement);
+                    });
+                    // Only scroll if there are messages
+                    if (data.messages.length > 0) {
+                        messagesArea.scrollTop = messagesArea.scrollHeight; // Auto-scroll to bottom
+                    } else {
+                        messagesArea.innerHTML = `<p class="text-center text-gray-500">No messages yet. Start the conversation!</p>`;
+                    }
+                    
+                } else {
+                    messagesArea.innerHTML = `<p class="text-center text-red-500">${data.message || 'Failed to load messages.'}</p>`;
+                }
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+                messagesArea.innerHTML = `<p class="text-center text-red-500">Error loading chat. Please refresh.</p>`;
+            } finally {
+                loadingMessages.classList.add('hidden'); // Ensure loading indicator is hidden
+            }
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const chatMessageDiv = document.getElementById('chatMessage');
+            const messageText = messageInput.value.trim();
+
+            if (!messageText) {
+                chatMessageDiv.textContent = 'Message cannot be empty.';
+                chatMessageDiv.className = 'mt-4 p-3 text-sm text-center rounded-md bg-red-100 text-red-700';
+                chatMessageDiv.classList.remove('hidden');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('claim_id', claimId);
+            formData.append('message_text', messageText);
+
+            try {
+                const response = await fetch('php/send_message.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    messageInput.value = ''; // Clear input
+                    fetchMessages(); // Reload messages to show new message
+                    chatMessageDiv.classList.add('hidden'); // Hide any previous error message
+                } else {
+                    chatMessageDiv.textContent = data.message;
+                    chatMessageDiv.className = 'mt-4 p-3 text-sm text-center rounded-md bg-red-100 text-red-700';
+                    chatMessageDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                chatMessageDiv.textContent = 'An error occurred while sending message.';
+                chatMessageDiv.className = 'mt-4 p-3 text-sm text-center rounded-md bg-red-100 text-red-700';
+                chatMessageDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
