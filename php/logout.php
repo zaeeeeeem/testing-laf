@@ -3,6 +3,6 @@
 session_start();
 $_SESSION = array(); // Unset all of the session variables
 session_destroy(); // Destroy the session.
-header("location: ../login.html"); // Redirect to login page
+header("location: ../index.html"); // Redirect to login page
 exit;
 ?>
